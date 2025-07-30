@@ -7,37 +7,38 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Adab Berpakaian", layout="centered", page_icon="👕")
 
+# Cegah error rerun
+if "submitted_once" not in st.session_state:
+    st.session_state["submitted_once"] = False
+if "updated_once" not in st.session_state:
+    st.session_state["updated_once"] = False
+if "deleted_once" not in st.session_state:
+    st.session_state["deleted_once"] = False
+
+# CSS
 st.markdown("""
 <style>
-    .main {
-        background-color: #f0f9ff;
-    }
-    .stApp {
-        font-family: 'Segoe UI', sans-serif;
-    }
+    .main { background-color: #f0f9ff; }
+    .stApp { font-family: 'Segoe UI', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("👕 Analisis Adab Berpakaian")
 st.markdown("Yuk isi hasil survei teman dan lihat hasil analisismu!")
 
-# Input user (siswa)
+# Sidebar
 st.sidebar.title("🧒 Identitas Siswa")
 nama_user = st.sidebar.text_input("Nama Kamu")
 
-# Path file Excel
+# File Excel
 folder = "data_output"
 os.makedirs(folder, exist_ok=True)
 filename = os.path.join(folder, "hasil_survei_siswa.xlsx")
 
-# Inisialisasi session state
-if "runned" not in st.session_state:
-    st.session_state.runned = False
-
 if nama_user:
     st.success(f"Data akan disimpan atas nama: **{nama_user}**")
 
-    # Form Input Data
+    # FORM INPUT
     with st.form("form_input"):
         st.subheader("📝 Masukkan Data Wawancara Teman")
         nama = st.text_input("Nama Teman")
@@ -47,7 +48,6 @@ if nama_user:
         submitted = st.form_submit_button("✅ Tambahkan Data")
 
         if submitted:
-            st.success(f"Data untuk {nama} berhasil ditambahkan!")
             new_data = {
                 "Nama User": nama_user,
                 "Nama Teman": nama,
@@ -55,64 +55,77 @@ if nama_user:
                 "Jenis Pakaian": jenis,
                 "Menutup Aurat": aurat
             }
-
-            # Simpan ke Excel bersama
             df_new = pd.DataFrame([new_data])
             if os.path.exists(filename):
                 df_existing = pd.read_excel(filename)
                 df_combined = pd.concat([df_existing, df_new], ignore_index=True)
             else:
                 df_combined = df_new
-
             df_combined.to_excel(filename, index=False)
-            st.info(f"📁 Data ditambahkan ke file: `{filename}`")
+            st.session_state["submitted_once"] = True
+            st.success(f"Data untuk {nama} berhasil ditambahkan!")
 
-    # Baca dan tampilkan data user
+    # Reload setelah tambah data
+    if st.session_state["submitted_once"]:
+        st.session_state["submitted_once"] = False
+        st.rerun()
+
+    # LOAD DATA
     if os.path.exists(filename):
         df_all = pd.read_excel(filename)
         df = df_all[df_all["Nama User"] == nama_user]
     else:
+        df_all = pd.DataFrame()
         df = pd.DataFrame()
 
     if not df.empty:
         st.subheader(f"📋 Data Hasil Wawancara oleh {nama_user}")
         st.dataframe(df, use_container_width=True)
 
-        # CRUD: Edit / Hapus
+        # CRUD
         st.subheader("🛠️ Edit / Hapus Data")
-        pilihan_index = st.selectbox("Pilih data yang ingin diedit / dihapus:", df.index, format_func=lambda x: f"{df.loc[x, 'Nama Teman']} - {df.loc[x, 'Warna']}")
+        pilihan_index = st.selectbox(
+            "Pilih data yang ingin diedit / dihapus:",
+            df.index,
+            format_func=lambda x: f"{df.loc[x, 'Nama Teman']} - {df.loc[x, 'Warna']}"
+        )
 
         with st.form("form_edit"):
             nama_edit = st.text_input("Edit Nama Teman", df.loc[pilihan_index, 'Nama Teman'])
-            warna_edit = st.selectbox("Edit Warna Pakaian", ["Putih", "Hitam", "Biru", "Merah", "Lainnya"], index=["Putih", "Hitam", "Biru", "Merah", "Lainnya"].index(df.loc[pilihan_index, 'Warna']))
+            warna_edit = st.selectbox("Edit Warna", ["Putih", "Hitam", "Biru", "Merah", "Lainnya"],
+                                      index=["Putih", "Hitam", "Biru", "Merah", "Lainnya"].index(df.loc[pilihan_index, 'Warna']))
             jenis_edit = st.text_input("Edit Jenis Pakaian", df.loc[pilihan_index, 'Jenis Pakaian'])
-            aurat_edit = st.radio("Edit Status Aurat", ["✓", "✗"], index=["✓", "✗"].index(df.loc[pilihan_index, 'Menutup Aurat']))
-
+            aurat_edit = st.radio("Edit Status Aurat", ["✓", "✗"],
+                                  index=["✓", "✗"].index(df.loc[pilihan_index, 'Menutup Aurat']))
             col1, col2 = st.columns(2)
             with col1:
                 update_btn = st.form_submit_button("📏 Simpan Perubahan")
             with col2:
-                delete_btn = st.form_submit_button("🖑️ Hapus Data")
+                delete_btn = st.form_submit_button("🗑️ Hapus Data")
 
-            if update_btn and not st.session_state.runned:
+            if update_btn:
                 index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
                 df_all.loc[index_global, ['Nama Teman', 'Warna', 'Jenis Pakaian', 'Menutup Aurat']] = [
                     nama_edit, warna_edit, jenis_edit, aurat_edit
                 ]
                 df_all.to_excel(filename, index=False)
+                st.session_state["updated_once"] = True
                 st.success("✅ Data berhasil diperbarui!")
-                st.session_state.runned = True
-                st.stop()
 
-            if delete_btn and not st.session_state.runned:
+            if delete_btn:
                 index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
                 df_all.drop(index=index_global, inplace=True)
                 df_all.to_excel(filename, index=False)
-                st.warning("🖑️ Data berhasil dihapus.")
-                st.session_state.runned = True
-                st.stop()
+                st.session_state["deleted_once"] = True
+                st.warning("🗑️ Data berhasil dihapus.")
 
-        # Visualisasi
+        # Refresh setelah update/hapus
+        if st.session_state["updated_once"] or st.session_state["deleted_once"]:
+            st.session_state["updated_once"] = False
+            st.session_state["deleted_once"] = False
+            st.rerun()
+
+        # Grafik
         st.subheader("📊 Grafik Warna Pakaian")
         warna_count = df['Warna'].value_counts()
         fig, ax = plt.subplots()
@@ -145,7 +158,7 @@ if nama_user:
         else:
             st.warning("⚠️ Masih banyak teman yang perlu belajar adab berpakaian.")
 
-        # Download PDF
+        # PDF
         st.subheader("📄 Unduh Hasil Analisis (PDF)")
         pdf_file = os.path.join(folder, f"{nama_user.replace(' ', '_')}_laporan.pdf")
         warna_chart = os.path.join(folder, f"{nama_user}_warna.png")
@@ -161,7 +174,6 @@ if nama_user:
             pdf.cell(0, 10, f"Nama Siswa: {nama_user}", ln=True)
             pdf.cell(0, 10, f"Tanggal: {datetime.now().strftime('%d-%m-%Y')}", ln=True)
             pdf.ln(5)
-
             pdf.set_font("Arial", 'B', 12)
             pdf.cell(0, 10, "Data Teman yang Disurvei:", ln=True)
             pdf.set_font("Arial", '', 11)
