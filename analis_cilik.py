@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import os
-from openpyxl import load_workbook
 from fpdf import FPDF
 
 st.set_page_config(page_title="Adab Berpakaian", layout="centered", page_icon="👕")
@@ -23,13 +22,17 @@ st.title("👕 Analisis Adab Berpakaian")
 st.markdown("Yuk isi hasil survei teman dan lihat hasil analisismu!")
 
 # Input user (siswa)
-st.sidebar.title("🧒 Identitas Kelompok")
+st.sidebar.title("🧒 Identitas Siswa")
 nama_user = st.sidebar.text_input("Nama Kamu")
 
 # Path file Excel
 folder = "data_output"
 os.makedirs(folder, exist_ok=True)
 filename = os.path.join(folder, "hasil_survei_siswa.xlsx")
+
+# Inisialisasi session state
+if "runned" not in st.session_state:
+    st.session_state.runned = False
 
 if nama_user:
     st.success(f"Data akan disimpan atas nama: **{nama_user}**")
@@ -75,7 +78,7 @@ if nama_user:
         st.subheader(f"📋 Data Hasil Wawancara oleh {nama_user}")
         st.dataframe(df, use_container_width=True)
 
-        # ======== CRUD FITUR ========
+        # CRUD: Edit / Hapus
         st.subheader("🛠️ Edit / Hapus Data")
         pilihan_index = st.selectbox("Pilih data yang ingin diedit / dihapus:", df.index, format_func=lambda x: f"{df.loc[x, 'Nama Teman']} - {df.loc[x, 'Warna']}")
 
@@ -91,24 +94,25 @@ if nama_user:
             with col2:
                 delete_btn = st.form_submit_button("🖑️ Hapus Data")
 
-            if update_btn:
+            if update_btn and not st.session_state.runned:
                 index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
                 df_all.loc[index_global, ['Nama Teman', 'Warna', 'Jenis Pakaian', 'Menutup Aurat']] = [
                     nama_edit, warna_edit, jenis_edit, aurat_edit
                 ]
                 df_all.to_excel(filename, index=False)
                 st.success("✅ Data berhasil diperbarui!")
-                st.experimental_rerun()
+                st.session_state.runned = True
+                st.stop()
 
-            if delete_btn:
-                df_all.drop(index=df.index[pilihan_index], inplace=True)
+            if delete_btn and not st.session_state.runned:
+                index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
+                df_all.drop(index=index_global, inplace=True)
                 df_all.to_excel(filename, index=False)
-                st.success("🗑️ Data berhasil dihapus.")
-                st.session_state.clear()
-                st.experimental_rerun()
+                st.warning("🖑️ Data berhasil dihapus.")
+                st.session_state.runned = True
+                st.stop()
 
-
-        # ======== Visualisasi dan PDF ========
+        # Visualisasi
         st.subheader("📊 Grafik Warna Pakaian")
         warna_count = df['Warna'].value_counts()
         fig, ax = plt.subplots()
@@ -118,13 +122,14 @@ if nama_user:
         ax.set_title("Jumlah Teman Berdasarkan Warna Pakaian")
         st.pyplot(fig)
 
-        st.subheader("🦕 Grafik Menutup Aurat")
+        st.subheader("🧕 Grafik Menutup Aurat")
         aurat_count = df['Menutup Aurat'].value_counts()
         fig2, ax2 = plt.subplots()
         ax2.pie(aurat_count, labels=aurat_count.index, autopct='%1.1f%%', colors=['#86efac', '#fda4af'])
         ax2.set_title("Persentase Teman yang Menutup Aurat")
         st.pyplot(fig2)
 
+        # Kesimpulan
         st.subheader("🧠 Kesimpulan Otomatis")
         total = len(df)
         warna_terbanyak = warna_count.idxmax() if not warna_count.empty else "-"
@@ -140,7 +145,7 @@ if nama_user:
         else:
             st.warning("⚠️ Masih banyak teman yang perlu belajar adab berpakaian.")
 
-        # PDF Download
+        # Download PDF
         st.subheader("📄 Unduh Hasil Analisis (PDF)")
         pdf_file = os.path.join(folder, f"{nama_user.replace(' ', '_')}_laporan.pdf")
         warna_chart = os.path.join(folder, f"{nama_user}_warna.png")
@@ -184,17 +189,16 @@ if nama_user:
             pdf.multi_cell(0, 8, txt=kesimpulan_text)
             pdf.output(pdf_path)
 
-        if st.button("📅 Download PDF"):
+        if st.button("📥 Download PDF"):
             fig.savefig(warna_chart)
             fig2.savefig(aurat_chart)
             create_pdf(df, kesimpulan, pdf_file, warna_chart, aurat_chart)
             with open(pdf_file, "rb") as f:
                 st.download_button("Klik untuk mengunduh", f, file_name=os.path.basename(pdf_file), mime="application/pdf")
-            if os.path.exists(warna_chart): os.remove(warna_chart)
-            if os.path.exists(aurat_chart): os.remove(aurat_chart)
+            os.remove(warna_chart)
+            os.remove(aurat_chart)
 
     else:
         st.info("Belum ada data yang kamu masukkan. Silakan isi formulir di atas.")
-
 else:
     st.warning("Silakan isi nama kamu di sidebar terlebih dahulu.")
