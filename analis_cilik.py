@@ -27,8 +27,8 @@ st.title("👕 Analisis Adab Berpakaian")
 st.markdown("Yuk isi hasil survei teman dan lihat hasil analisismu!")
 
 # Sidebar
-st.sidebar.title("🧒 Identitas Siswa")
-nama_user = st.sidebar.text_input("Nama Kamu")
+st.sidebar.title("🧒 Identitas Kelompok")
+nama_user = st.sidebar.text_input("Nama Kelompok")
 
 # File Excel
 folder = "data_output"
