@@ -101,11 +101,12 @@ if nama_user:
                 st.experimental_rerun()
 
             if delete_btn:
-                index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
-                df_all.drop(index=index_global, inplace=True)
+                df_all.drop(index=df.index[pilihan_index], inplace=True)
                 df_all.to_excel(filename, index=False)
-                st.warning("🖑️ Data berhasil dihapus.")
+                st.success("🗑️ Data berhasil dihapus.")
+                st.session_state.clear()
                 st.experimental_rerun()
+
 
         # ======== Visualisasi dan PDF ========
         st.subheader("📊 Grafik Warna Pakaian")
