@@ -23,7 +23,7 @@ st.title("👕 Analisis Adab Berpakaian")
 st.markdown("Yuk isi hasil survei teman dan lihat hasil analisismu!")
 
 # Input user (siswa)
-st.sidebar.title("🧒 Identitas Siswa")
+st.sidebar.title("🧒 Identitas Kelompok")
 nama_user = st.sidebar.text_input("Nama Kamu")
 
 # Path file Excel
@@ -75,7 +75,39 @@ if nama_user:
         st.subheader(f"📋 Data Hasil Wawancara oleh {nama_user}")
         st.dataframe(df, use_container_width=True)
 
-        # Grafik warna pakaian
+        # ======== CRUD FITUR ========
+        st.subheader("🛠️ Edit / Hapus Data")
+        pilihan_index = st.selectbox("Pilih data yang ingin diedit / dihapus:", df.index, format_func=lambda x: f"{df.loc[x, 'Nama Teman']} - {df.loc[x, 'Warna']}")
+
+        with st.form("form_edit"):
+            nama_edit = st.text_input("Edit Nama Teman", df.loc[pilihan_index, 'Nama Teman'])
+            warna_edit = st.selectbox("Edit Warna Pakaian", ["Putih", "Hitam", "Biru", "Merah", "Lainnya"], index=["Putih", "Hitam", "Biru", "Merah", "Lainnya"].index(df.loc[pilihan_index, 'Warna']))
+            jenis_edit = st.text_input("Edit Jenis Pakaian", df.loc[pilihan_index, 'Jenis Pakaian'])
+            aurat_edit = st.radio("Edit Status Aurat", ["✓", "✗"], index=["✓", "✗"].index(df.loc[pilihan_index, 'Menutup Aurat']))
+
+            col1, col2 = st.columns(2)
+            with col1:
+                update_btn = st.form_submit_button("📏 Simpan Perubahan")
+            with col2:
+                delete_btn = st.form_submit_button("🖑️ Hapus Data")
+
+            if update_btn:
+                index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
+                df_all.loc[index_global, ['Nama Teman', 'Warna', 'Jenis Pakaian', 'Menutup Aurat']] = [
+                    nama_edit, warna_edit, jenis_edit, aurat_edit
+                ]
+                df_all.to_excel(filename, index=False)
+                st.success("✅ Data berhasil diperbarui!")
+                st.experimental_rerun()
+
+            if delete_btn:
+                index_global = df_all[df_all["Nama User"] == nama_user].index[pilihan_index]
+                df_all.drop(index=index_global, inplace=True)
+                df_all.to_excel(filename, index=False)
+                st.warning("🖑️ Data berhasil dihapus.")
+                st.experimental_rerun()
+
+        # ======== Visualisasi dan PDF ========
         st.subheader("📊 Grafik Warna Pakaian")
         warna_count = df['Warna'].value_counts()
         fig, ax = plt.subplots()
@@ -85,21 +117,18 @@ if nama_user:
         ax.set_title("Jumlah Teman Berdasarkan Warna Pakaian")
         st.pyplot(fig)
 
-        # Grafik menutup aurat
-        st.subheader("🧕 Grafik Menutup Aurat")
+        st.subheader("🦕 Grafik Menutup Aurat")
         aurat_count = df['Menutup Aurat'].value_counts()
         fig2, ax2 = plt.subplots()
         ax2.pie(aurat_count, labels=aurat_count.index, autopct='%1.1f%%', colors=['#86efac', '#fda4af'])
         ax2.set_title("Persentase Teman yang Menutup Aurat")
         st.pyplot(fig2)
 
-        # Kesimpulan Otomatis
         st.subheader("🧠 Kesimpulan Otomatis")
         total = len(df)
         warna_terbanyak = warna_count.idxmax() if not warna_count.empty else "-"
         aurat_ok = aurat_count.get("✓", 0)
-        kesimpulan = f"Dari {total} responden, warna pakaian terbanyak adalah {warna_terbanyak}. " \
-                     f"Sebanyak {aurat_ok} dari {total} teman memakai pakaian yang menutup aurat."
+        kesimpulan = f"Dari {total} responden, warna pakaian terbanyak adalah {warna_terbanyak}. Sebanyak {aurat_ok} dari {total} teman memakai pakaian yang menutup aurat."
         st.info(kesimpulan)
 
         if aurat_ok == total and total > 0:
@@ -110,8 +139,7 @@ if nama_user:
         else:
             st.warning("⚠️ Masih banyak teman yang perlu belajar adab berpakaian.")
 
-        # Tombol download PDF
-                # Tombol download PDF
+        # PDF Download
         st.subheader("📄 Unduh Hasil Analisis (PDF)")
         pdf_file = os.path.join(folder, f"{nama_user.replace(' ', '_')}_laporan.pdf")
         warna_chart = os.path.join(folder, f"{nama_user}_warna.png")
@@ -137,46 +165,35 @@ if nama_user:
                 pdf.multi_cell(0, 8, txt=line)
             pdf.ln(5)
 
-            # Sisip grafik warna
-            pdf.set_font("Arial", 'B', 12)
-            pdf.cell(0, 10, "Grafik Warna Pakaian:", ln=True)
             if os.path.exists(warna_chart_path):
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 10, "Grafik Warna Pakaian:", ln=True)
                 pdf.image(warna_chart_path, w=180)
                 pdf.ln(5)
 
-            # Sisip grafik aurat
-            pdf.set_font("Arial", 'B', 12)
-            pdf.cell(0, 10, "Grafik Menutup Aurat:", ln=True)
             if os.path.exists(aurat_chart_path):
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 10, "Grafik Menutup Aurat:", ln=True)
                 pdf.image(aurat_chart_path, w=180)
                 pdf.ln(5)
 
-            # Tambahkan kesimpulan
             pdf.set_font("Arial", 'B', 12)
             pdf.cell(0, 10, "Kesimpulan:", ln=True)
             pdf.set_font("Arial", '', 11)
             pdf.multi_cell(0, 8, txt=kesimpulan_text)
-
             pdf.output(pdf_path)
 
-        if st.button("📥 Download PDF"):
-            # Simpan grafik sementara
+        if st.button("📅 Download PDF"):
             fig.savefig(warna_chart)
             fig2.savefig(aurat_chart)
-
-            # Buat PDF lengkap
             create_pdf(df, kesimpulan, pdf_file, warna_chart, aurat_chart)
-
-            # Unduh file
             with open(pdf_file, "rb") as f:
                 st.download_button("Klik untuk mengunduh", f, file_name=os.path.basename(pdf_file), mime="application/pdf")
-
-            # Bersihkan file sementara
             if os.path.exists(warna_chart): os.remove(warna_chart)
             if os.path.exists(aurat_chart): os.remove(aurat_chart)
 
-
     else:
         st.info("Belum ada data yang kamu masukkan. Silakan isi formulir di atas.")
+
 else:
     st.warning("Silakan isi nama kamu di sidebar terlebih dahulu.")
